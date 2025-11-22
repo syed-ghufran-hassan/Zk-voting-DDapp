@@ -4,7 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 import { LeanIMT, LeanIMTData } from "@zk-kit/lean-imt.sol/LeanIMT.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 /// Checkpoint 6 //////
-// import {IVerifier} from "./Verifier.sol";
+import {IVerifier} from "./Verifier.sol";
 
 contract Voting is Ownable {
     using LeanIMT for LeanIMTData;
@@ -30,8 +30,13 @@ contract Voting is Ownable {
     uint256 private s_noVotes;
 
     /// Checkpoint 2 //////
+    mapping(address => bool) private s_hasRegistered;
+    mapping(uint256 => bool) private s_commitments;
+    LeanIMTData private s_tree;
 
     /// Checkpoint 6 //////
+    IVerifier private immutable i_verifier;
+    mapping(bytes32 => bool) private s_nullifierHashes;
 
     //////////////
     /// Events ///
@@ -55,6 +60,7 @@ contract Voting is Ownable {
     constructor(address _owner, address _verifier, string memory _question) Ownable(_owner) {
         s_question = _question;
         /// Checkpoint 6 //////
+        i_verifier = IVerifier(_verifier);
     }
 
     //////////////////
@@ -85,6 +91,17 @@ contract Voting is Ownable {
      */
     function register(uint256 _commitment) public {
         /// Checkpoint 2 //////
+        if (!s_voters[msg.sender] || s_hasRegistered[msg.sender]) {
+            revert Voting__NotAllowedToVote();
+        }
+        if (s_commitments[_commitment]) {
+            revert Voting__CommitmentAlreadyAdded(_commitment);
+        }
+        s_commitments[_commitment] = true;
+        s_hasRegistered[msg.sender] = true;
+        s_tree.insert(_commitment);
+        
+        emit NewLeaf(s_tree.size - 1, _commitment);
     }
 
     /**
@@ -98,8 +115,56 @@ contract Voting is Ownable {
      * @param _vote Encoded vote: 1 for yes, otherwise counted as no
      * @param _depth Tree depth used by the circuit
      */
-    function vote(bytes memory _proof, bytes32 _nullifierHash, bytes32 _root, bytes32 _vote, bytes32 _depth) public {
-        /// Checkpoint 6 //////
+    function vote(
+        bytes calldata _proof,
+        bytes32 _root,
+        bytes32 _nullifierHash,
+        bytes32 _vote,
+        bytes32 _depth
+    ) public {
+        // 1) Tree must not be empty
+        if (s_tree.size == 0) {
+            revert Voting__EmptyTree();
+        }
+
+        // 2) Supplied root must match current Merkle root
+        if (_root != bytes32(s_tree.root())) {
+            revert Voting__InvalidRoot();
+        }
+
+        // 3) Build public inputs in correct order
+        bytes32[] memory publicInputs = new bytes32[](4);
+        publicInputs[0] = _root;
+        publicInputs[1] = _nullifierHash;
+        publicInputs[2] = _vote;
+        publicInputs[3] = _depth;
+
+        // 4) Verify proof
+        if (!i_verifier.verify(_proof, publicInputs)) {
+            revert Voting__InvalidProof();
+        }
+
+        // 5) Nullifier check
+        if (s_nullifierHashes[_nullifierHash]) {
+            revert Voting__NullifierHashAlreadyUsed(_nullifierHash);
+        }
+        s_nullifierHashes[_nullifierHash] = true;
+
+        // 6) Count vote
+        if (_vote == bytes32(uint256(1))) {
+            s_yesVotes++;
+        } else {
+            s_noVotes++;
+        }
+
+        emit VoteCast(
+            _nullifierHash,
+            msg.sender,
+            _vote == bytes32(uint256(1)),
+            block.timestamp,
+            s_yesVotes,
+            s_noVotes
+        );
     }
 
     /////////////////////////
@@ -124,14 +189,23 @@ contract Voting is Ownable {
         yesVotes = s_yesVotes;
         noVotes = s_noVotes;
         /// Checkpoint 2 //////
-        // size = s_tree.size;
-        // depth = s_tree.depth;
-        // root = s_tree.root();
+        size = s_tree.size;
+        depth = s_tree.depth;
+        root = s_tree.root();
     }
 
     function getVoterData(address _voter) public view returns (bool voter, bool registered) {
         voter = s_voters[_voter];
-        // /// Checkpoint 2 //////
-        // registered = s_hasRegistered[_voter];
+        /// Checkpoint 2 //////
+        registered = s_hasRegistered[_voter];
+    }
+
+    /// Checkpoint 6 //////
+    function getVerifier() public view returns (address) {
+        return address(i_verifier);
+    }
+
+    function isNullifierUsed(bytes32 _nullifierHash) public view returns (bool) {
+        return s_nullifierHashes[_nullifierHash];
     }
 }
