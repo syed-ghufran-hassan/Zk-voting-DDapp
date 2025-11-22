@@ -16,8 +16,8 @@ import {
 } from "~~/utils/proofStorage";
 
 ////// Checkpoint 9 //////
-// import {  parseEther, createTestClient } from "viem";
-// import { generatePrivateKey } from "viem/accounts";
+  import {  parseEther, createTestClient } from "viem";
+ import { generatePrivateKey } from "viem/accounts";
 
 type LocalProofData = {
   proof: Uint8Array;
@@ -35,16 +35,38 @@ const sendVoteWithBurner = async ({
   walletAddress: `0x${string}`;
   proofData: LocalProofData;
 }): Promise<string> => {
-  ////// Checkpoint 9 //////
-  console.debug(
-    "Checkpoint 9",
-    !!viemContract,
-    !!publicClient,
-    !!walletAddress,
-    !!proofData,
-    uint8ArrayToHexString(new Uint8Array(0)),
-  ); // placeholder
-  throw new Error("Checkpoint 9"); // placeholder
+  /// Checkpoint 9 //////
+  const needed = parseEther("0.01");
+  const bal = await publicClient.getBalance({ address: walletAddress });
+  if (bal < needed) {
+    const testClient = createTestClient({ chain: hardhat, mode: "hardhat", transport: http("http://localhost:8545") });
+    await testClient.setBalance({ address: walletAddress, value: needed });
+  }
+
+  const hash = await viemContract.write.vote([
+    uint8ArrayToHexString(proofData.proof),
+    proofData.publicInputs[0],
+    proofData.publicInputs[1],
+    proofData.publicInputs[2],
+    proofData.publicInputs[3],
+  ]);
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  return receipt.transactionHash;
+};
+
+const generateBurnerWallet = () => {
+  /// Checkpoint 9 //////
+  const privateKey = generatePrivateKey();
+  const account = privateKeyToAccount(privateKey);
+  const wallet = { privateKey: privateKey as `0x${string}`, address: account.address as `0x${string}` };
+  setBurnerWallet(wallet);
+
+  const effectiveContractAddress = contractAddress || contractInfo?.address;
+  if (effectiveContractAddress && userAddress) {
+    saveBurnerWalletToLocalStorage(wallet.privateKey, wallet.address, effectiveContractAddress, userAddress);
+  }
+
+  return wallet;
 };
 
 export const VoteWithBurnerHardhat = ({ contractAddress }: { contractAddress?: `0x${string}` }) => {
