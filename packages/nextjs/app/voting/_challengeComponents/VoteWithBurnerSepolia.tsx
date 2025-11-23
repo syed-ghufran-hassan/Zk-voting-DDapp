@@ -67,8 +67,8 @@ const createSmartAccount = async (): Promise<{
     });
     return {
       smartAccountClient,
-      smartAccount: account.address as 0x$`{string}`,
-      walletOwner: wallet.address as 0x$`{string}`,
+      smartAccount: account.address as `0x${string}`,
+      walletOwner: wallet.address as `0x${string}`,
     };
   } catch (error) {
     console.error("Error creating smart account:", error);
@@ -86,7 +86,7 @@ const voteOnSepolia = async ({
   contractInfo: any;
   contractAddress: any;
   smartAccountClient: any;
-}): Promise<{ userOpHash: 0x$`{string}` }> => {
+}): Promise<{ userOpHash: `0x${string}` }> => {
   if (!contractInfo && !contractAddress) throw new Error("Contract not found");
   /// Checkpoint 10 //////
   const callData = encodeFunctionData({
@@ -102,7 +102,7 @@ const voteOnSepolia = async ({
   });
 
   const userOpHash = await smartAccountClient.sendTransaction({
-    to: (contractAddress || contractInfo?.address) as 0x$`{string}`,
+    to: (contractAddress || contractInfo?.address) as `0x${string}`,
     data: callData,
     value: 0n,
   });
