@@ -25,7 +25,7 @@ const pimlicoUrl = `https://api.pimlico.io/v2/${sepolia.id}/rpc?apikey=${process
 
 const CHAIN_USED = sepolia;
 //// Checkpoint 10 //////
-// const RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
+ const RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
 
 const pimlicoClient = createPimlicoClient({
   chain: CHAIN_USED,
@@ -38,8 +38,8 @@ const pimlicoClient = createPimlicoClient({
 
 const createSmartAccount = async (): Promise<{
   smartAccountClient: any;
-  smartAccount: 0x$`{string}`;
-  walletOwner: 0x$`{string}`;
+  smartAccount: `0x${string}`;
+  walletOwner: `0x${string}`;
 }> => {
   try {
     /// Checkpoint 10 //////
